@@ -1,6 +1,6 @@
 %% training data & test data 만들기
 % trainRegressionModel로 사전 변수값 가져오기
-% trainData & testData 엑셀 파일을 직접 만들어서 평균치를 구하자
+% trainData  & testData 엑셀 파일을 직접 만들어서 평균치를 구하자
 a = readtable('White_Wine.xlsx');
 
 inputTable = a;
@@ -18,17 +18,44 @@ validationPredictors = predictors(cvp.test, :);
 
 trainData = trainingPredictors;
 trainData.Quality = trainingResponse;
-writetable(trainData, 'trainData.xlsx');
+writetable(trainData, 'trainData3.xlsx');
 testData = validationPredictors;
-writetable(testData, 'testData.xlsx');
+writetable(testData, 'testData3.xlsx');
 testResoponseData = validationResponse;
-writetable(table(testResoponseData), 'testResponseData.xlsx');
+writetable(table(testResoponseData), 'testResponseData3.xlsx');
 
 %% mlWine 함수를 만든다
 % quality = mlWine('trainData.xlsx','testData.xlsx');
 
 %% mlWineTest 함수를 통해 mse를 얻어 test 해본다.
+% 기본 데이터
+
 mse = mlWineTest('trainData.xlsx','testData.xlsx', 'testResponseData.xlsx')
+mse1 = mlWineTest('trainData1.xlsx','testData1.xlsx', 'testResponseData1.xlsx')
+mse2 = mlWineTest('trainData2.xlsx','testData2.xlsx', 'testResponseData2.xlsx')
+mse3 = mlWineTest('trainData3.xlsx','testData3.xlsx', 'testResponseData3.xlsx')
+
+
+% % 로그 씌운 데이터
+% trainData = trainingPredictors;
+% testData = validationPredictors;
+% 
+% for i = 2:1:3920
+%     trainData.ResSugar(i) = log10(trainData.ResSugar(i));
+% end
+% for i = 2:1:980
+%     testData.ResSugar(i) = log10(testData.ResSugar(i));
+% end
+% 
+% trainData.Quality = trainingResponse;
+% writetable(trainData, 'trainData.xlsx');
+% writetable(testData, 'testData.xlsx');
+% testResoponseData = validationResponse;
+% writetable(table(testResoponseData), 'testResponseData.xlsx');
+% 
+% mse2 = mlWineTest('trainData.xlsx','testData.xlsx', 'testResponseData.xlsx')
+
+% Alchole 제외
 
 %% mlWine 함수를 통해 최적화 하는 방법
 % 1. 하이퍼파라미터 튜닝

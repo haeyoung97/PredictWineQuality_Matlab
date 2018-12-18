@@ -1,4 +1,4 @@
-function [trainedModel, validationRMSE] = trainRegressionModelSVM(trainingData,KernelFunction,KernelScale)
+function [trainedModel, validationRMSE] = trainRegressionModelGauss(trainingData,BasisFunction,KernelFunction,kfold)
 % [trainedModel, validationRMSE] = trainRegressionModel(trainingData)
 % 훈련된 회귀 모델과 그 RMSE을(를) 반환합니다. 이 코드는 회귀 학습기 앱에서 훈련된 모델
 % 을 다시 만듭니다. 생성된 코드를 사용하여 동일한 모델을 새 데이터로 훈련시키는 것을 자동
@@ -33,7 +33,7 @@ function [trainedModel, validationRMSE] = trainRegressionModelSVM(trainingData,K
 % 다. 세부 정보를 보려면 다음을 입력하십시오.
 %   trainedModel.HowToPredict
 
-% MATLAB에서 2018-12-07 17:08:19에 자동 생성됨
+% MATLAB에서 2018-12-08 09:50:41에 자동 생성됨
 
 
 % 예측 변수와 응답 변수 추출
@@ -47,30 +47,21 @@ isCategoricalPredictor = [false, false, false, false, false, false, false, false
 
 % 회귀 모델 훈련
 % 이 코드는 모든 모델 옵션을 지정하고 모델을 훈련시킵니다.
-responseScale = iqr(response);
-if ~isfinite(responseScale) || responseScale == 0.0
-    responseScale = 1.0;
-end
-boxConstraint = responseScale/1.349;
-epsilon = responseScale/13.49;
-regressionSVM = fitrsvm(...
+regressionGP = fitrgp(...
     predictors, ...
     response, ...
-    'KernelFunction',  KernelFunction, ...
-    'PolynomialOrder', [], ...
-    'KernelScale', KernelScale, ...
-    'BoxConstraint', boxConstraint, ...
-    'Epsilon', epsilon, ...
+    'BasisFunction', BasisFunction, ...
+    'KernelFunction', KernelFunction, ...
     'Standardize', true);
 
 % 예측 함수를 사용하여 결과 구조체 생성
 predictorExtractionFcn = @(t) t(:, predictorNames);
-svmPredictFcn = @(x) predict(regressionSVM, x);
-trainedModel.predictFcn = @(x) svmPredictFcn(predictorExtractionFcn(x));
+gpPredictFcn = @(x) predict(regressionGP, x);
+trainedModel.predictFcn = @(x) gpPredictFcn(predictorExtractionFcn(x));
 
 % 추가적인 필드를 결과 구조체에 추가
 trainedModel.RequiredVariables = {'FixAcid', 'VolAcid', 'CitAcid', 'ResSugar', 'Chlorides', 'FreeS02', 'TotalS02', 'Density', 'pH', 'Sulphates', 'Alcohol'};
-trainedModel.RegressionSVM = regressionSVM;
+trainedModel.RegressionGP = regressionGP;
 trainedModel.About = '이 구조체는 회귀 학습기 R2018b에서 내보낸 훈련된 모델입니다.';
 trainedModel.HowToPredict = sprintf('새 테이블 T를 사용하여 예측하려면 다음을 사용하십시오. \n yfit = c.predictFcn(T) \n여기서 ''c''를 이 구조체를 나타내는 변수의 이름(예: ''trainedModel'')으로 바꾸십시오. \n \n테이블 T는 다음에서 반환된 변수를 포함해야 합니다. \n c.RequiredVariables \n변수 형식(예: 행렬/벡터, 데이터형)은 원래 훈련 데이터와 일치해야 합니다. \n추가 변수는 무시됩니다. \n \n자세한 내용은 <a href="matlab:helpview(fullfile(docroot, ''stats'', ''stats.map''), ''appregression_exportmodeltoworkspace'')">How to predict using an exported model</a>을(를) 참조하십시오.');
 
@@ -84,47 +75,10 @@ response = inputTable.Quality;
 isCategoricalPredictor = [false, false, false, false, false, false, false, false, false, false, false];
 
 % 교차 검증 수행
-KFolds = 5;
-cvp = cvpartition(size(response, 1), 'KFold', KFolds);
-% 예측값을 적절한 크기로 초기화
-validationPredictions = response;
-for fold = 1:KFolds
-    trainingPredictors = predictors(cvp.training(fold), :);
-    trainingResponse = response(cvp.training(fold), :);
-    foldIsCategoricalPredictor = isCategoricalPredictor;
-    
-    % 회귀 모델 훈련
-    % 이 코드는 모든 모델 옵션을 지정하고 모델을 훈련시킵니다.
-    responseScale = iqr(trainingResponse);
-    if ~isfinite(responseScale) || responseScale == 0.0
-        responseScale = 1.0;
-    end
-    boxConstraint = responseScale/1.349;
-    epsilon = responseScale/13.49;
-    regressionSVM = fitrsvm(...
-        trainingPredictors, ...
-        trainingResponse, ...
-        'KernelFunction', KernelFunction, ...
-        'PolynomialOrder', [], ...
-        'KernelScale', KernelScale, ...
-        'BoxConstraint', boxConstraint, ...
-        'Epsilon', epsilon, ...
-        'Standardize', true);
-    
-    % 예측 함수를 사용하여 결과 구조체 생성
-    svmPredictFcn = @(x) predict(regressionSVM, x);
-    validationPredictFcn = @(x) svmPredictFcn(x);
-    
-    % 추가적인 필드를 결과 구조체에 추가
-    
-    % 검증 예측값 계산
-    validationPredictors = predictors(cvp.test(fold), :);
-    foldPredictions = validationPredictFcn(validationPredictors);
-    
-    % 예측값을 원래 순서대로 저장
-    validationPredictions(cvp.test(fold), :) = foldPredictions;
-end
+partitionedModel = crossval(trainedModel.RegressionGP, 'KFold', kfold);
+
+% 검증 예측값 계산
+validationPredictions = kfoldPredict(partitionedModel);
 
 % 검증 RMSE 계산
-isNotMissing = ~isnan(validationPredictions) & ~isnan(response);
-validationRMSE = sqrt(nansum(( validationPredictions - response ).^2) / numel(response(isNotMissing) ));
+validationRMSE = sqrt(kfoldLoss(partitionedModel, 'LossFun', 'mse'));
